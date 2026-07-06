@@ -233,10 +233,12 @@ impl Bolt12InvoiceCreator for Client {
         // which is None for amountless offers and would yield a 0-value invoice that LND cannot
         // build blinded paths for.
         let amount = invoice_request.amount_msats().unwrap_or(0) as i64;
-        let description = match invoice_request.description() {
-            Some(description) => description.to_string(),
-            None => "".to_string(),
-        };
+        let description = invoice_request
+            .description()
+            .map(|d| d.to_string())
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("BOLT12 Offer: {}", d))
+            .unwrap_or_else(|| "BOLT12 Offer".to_string());
         let req = Invoice {
             memo: description,
             value_msat: amount,
