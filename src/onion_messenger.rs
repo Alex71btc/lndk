@@ -815,11 +815,25 @@ struct OnionMessageStream {
 #[async_trait]
 impl IncomingMessageProducer for OnionMessageStream {
     async fn receive(&mut self) -> Result<CustomMessage, Status> {
-        match self.message_subscription.message().await? {
-            Some(update) => Ok(native_update_to_custom_message(update)),
-            None => Err(Status::unknown("no message provided")),
+        loop {
+            match self.message_subscription.message().await? {
+                Some(update) if is_native_update_for_us(&update) => {
+                    return Ok(native_update_to_custom_message(update));
+                }
+                Some(_) => {
+                    trace!("Ignoring native onion message update already forwarded by LND");
+                }
+                None => return Err(Status::unknown("no message provided")),
+            }
         }
     }
+}
+
+/// LND publishes updates both for messages delivered to this node and for messages it has already
+/// forwarded. Only locally delivered messages contain custom records for LNDK to handle. Feeding a
+/// forwarded update into LDK would make LNDK forward the same onion message a second time.
+fn is_native_update_for_us(update: &OnionMessageUpdate) -> bool {
+    !update.custom_records.is_empty()
 }
 
 /// native_update_to_custom_message adapts an OnionMessageUpdate from LND's
@@ -1958,6 +1972,7 @@ mod tests {
             peer: pubkey(0).serialize().to_vec(),
             path_key,
             onion,
+            custom_records: HashMap::from([(64, vec![1])]),
             ..Default::default()
         };
 
@@ -1974,5 +1989,17 @@ mod tests {
         let mut parsed_bytes = vec![];
         parsed.write(&mut parsed_bytes).unwrap();
         assert_eq!(original_bytes, parsed_bytes);
+    }
+
+    #[test]
+    fn test_native_update_filters_messages_forwarded_by_lnd() {
+        let forwarded_update = OnionMessageUpdate::default();
+        assert!(!is_native_update_for_us(&forwarded_update));
+
+        let delivered_update = OnionMessageUpdate {
+            custom_records: HashMap::from([(64, vec![1])]),
+            ..Default::default()
+        };
+        assert!(is_native_update_for_us(&delivered_update));
     }
 }
