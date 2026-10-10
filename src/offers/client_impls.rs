@@ -237,7 +237,7 @@ impl Bolt12InvoiceCreator for Client {
             .description()
             .map(|d| d.to_string())
             .filter(|d| !d.is_empty())
-            .map(|d| format!("BOLT12 Offer: {}", d))
+            .map(|d| format!("BOLT12 Offer: {d}"))
             .unwrap_or_else(|| "BOLT12 Offer".to_string());
         let req = Invoice {
             memo: description,
