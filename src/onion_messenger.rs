@@ -647,7 +647,7 @@ async fn subscribe_custom_messages_with_retry(
                         }
                         Err(e) => {
                             error!("Error subscribing to message events: {e}.");
-                            return Ok(())
+                            return Err(e.into())
                         }
                     };
 
@@ -701,7 +701,7 @@ async fn subscribe_onion_messages_with_retry(
                         }
                         Err(e) => {
                             error!("Error subscribing to onion message events: {e}.");
-                            return Ok(())
+                            return Err(e.into())
                         }
                     };
 
